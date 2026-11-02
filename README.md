@@ -1,4 +1,4 @@
-# Player System
+# HCS
 
 A habit and discipline tracking prototype with a Next.js app, browser-based frontend, API scaffold, shared game engine, and database packages.
 
