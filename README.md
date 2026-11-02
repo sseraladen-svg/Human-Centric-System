@@ -1,8 +1,27 @@
 # Player System
 
-This repository contains a working local prototype with a real Next.js app shell, API routes, shared engine logic, and test coverage. It uses a mock in-memory user store by default so the app runs without external keys, while the database and Supabase wiring are scaffolded in the packages and environment files.
+A habit and discipline tracking prototype with a Next.js app, browser-based frontend, API scaffold, shared game engine, and database packages.
 
-The root URL (`http://localhost:3000`) serves the original prototype UI from `/player.html`. Its static assets are mirrored under `apps/web/public/` so Next.js can serve the page; the prototype stores progress in browser local storage by default.
+The root URL redirects to `/player.html`. The page and all browser assets have one canonical home under `apps/web/public/`. Progress in the prototype is saved in browser local storage by default.
+
+## Repository structure
+
+```text
+apps/
+  web/
+    app/                 Next.js pages and API route handlers
+    lib/                 Web application helpers
+    public/
+      player.html        Browser prototype entry point
+      prototype/          Prototype styles, scripts, and game logic
+packages/
+  db/                    Database schema and SQL migrations
+  engine/                Pure game rules and unit tests
+  shared/                Shared schemas and types
+jobs/                    Scheduled job handlers and tests
+e2e/                     Playwright browser tests
+docs/                    Deployment and project documentation
+```
 
 ## Local setup
 
@@ -25,7 +44,7 @@ The root URL (`http://localhost:3000`) serves the original prototype UI from `/p
 Schema and migration assets live under `packages/db/`.
 
 - `packages/db/src/schema.ts` contains the layout and row-level security definitions.
-- `packages/db/migrations/001_init.sql` is the seeded migration used for initialization.
+- `packages/db/migrations/001_init.sql` contains the initial migration.
 
 To apply migrations in a Supabase project, run the SQL in a Postgres session or use your preferred migration runner.
 
@@ -52,10 +71,12 @@ curl -X POST http://localhost:3000/api/jobs/judge \
 
 ## Deployment
 
+See [deployment guide](./docs/deployment.md) for the frontend asset layout and local/static hosting notes.
+
 1. Push the repo to a Node-compatible host or Vercel.
-2. Set the same environment variables in the hosting project settings.
-3. Map the Vercel project to the app root and deploy.
-4. Configure cron hits against the protected jobs endpoints using your platform scheduler.
+2. Set required environment variables in the hosting project settings.
+3. Deploy the app from the repository root.
+4. Configure scheduled requests to the protected jobs endpoints using your platform scheduler.
 
 ## Key rotation
 
