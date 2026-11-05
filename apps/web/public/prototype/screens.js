@@ -81,6 +81,58 @@ function act(a,i,el){sfx('tap');
     case 'arise':arise();break;
     case 'basedone':finishBase(false);break;
     case 'skipbase':finishBase(true);break;
+    case 'accounts':V.ov={k:'localAccount'};FV={};break;
+    case 'cancelAccounts':V.ov=null;FV={};break;
+    case 'createLocalProfile':{
+      if(!$('localConsent').checked){toast('Confirm browser storage consent before creating a profile.');break}
+      try{
+        const previousSave=HunterStorage.loadLegacyState();
+        const result=HunterStorage.createProfile({
+          name:FV.localProfileName||$('localProfileName').value,
+          initialState:previousSave||S,
+          localConsent:true,
+          cloudConsent:!!($('cloudConsent')&&$('cloudConsent').checked)
+        });
+        S=Object.assign(FRESH(),result.state);
+        if(window.HunterDB&&HunterDB.enabled)HunterDB.setUserId(result.profile.id);
+        V.ov=S.base?null:{k:'base'};FV={};
+        toast('Local profile created in this browser.');
+      }catch(error){
+        console.error('Could not create local profile.',error);
+        toast(error.message||'Could not create a profile in this browser.');
+      }
+      break;
+    }
+    case 'useLocalProfile':{
+      try{
+        const result=HunterStorage.activateProfile(i);
+        S=Object.assign(FRESH(),result.state||{});
+        S.name=result.profile.name;
+        if(window.HunterDB&&HunterDB.enabled)HunterDB.setUserId(result.profile.id);
+        V.ov=S.base?null:{k:'base'};FV={};
+        toast('Local profile selected.');
+      }catch(error){
+        console.error('Could not select local profile.',error);
+        toast(error.message||'Could not select that profile.');
+      }
+      break;
+    }
+    case 'sessionOnly':
+      HunterStorage.setSessionOnly();V.ov=S.base?null:{k:'base'};FV={};
+      toast('Continuing without saving progress on this device.');
+      break;
+    case 'forgetLocalProfile':
+      if(confirm('Delete this profile and its saved browser data? This cannot be undone.')){
+        try{
+          HunterStorage.forgetActiveProfile();
+          S=FRESH();V.ov={k:'localAccount'};FV={};
+          toast('Local profile data deleted.');
+        }catch(error){
+          console.error('Could not delete the local profile.',error);
+          toast('Could not delete this profile from browser storage.');
+        }
+      }
+      break;
     case 'rerun':V.ov={k:'base'};FV={};break;
     case 'exp':{const t=$('io');if(t)t.value=JSON.stringify(S);return}
     case 'imp':{try{const t=$('io').value,o=JSON.parse(t);if(!o||!o.quests||!o.stats)throw 0;S=Object.assign(FRESH(),o);toast('Backup imported.')}catch(e){toast('That backup text is not valid.')}break}
@@ -106,6 +158,22 @@ document.addEventListener('change',e=>{
   if(t.id==='sound'){S.sound=t.checked;save();if(t.checked)sfx('claim');return}
   if(t.id==='strict'){S.strict=t.checked;save();render();return}
   if(t.id==='pause'){S.pause=t.checked;save();render();return}
+  if(t.id==='cloudSync'){
+    try{
+      const enabled=HunterStorage.setCloudConsent(t.checked);
+      const profile=HunterStorage.activeProfile();
+      if(window.HunterDB&&HunterDB.enabled){
+        HunterDB.setUserId(profile.id);
+        if(enabled)HunterDB.pushDebounced(S);
+      }
+      toast(enabled?'Database sync enabled for this profile.':'Database sync disabled for this profile.');
+    }catch(error){
+      console.error('Could not update database sync consent.',error);
+      toast('Could not update database sync consent.');
+      render();
+    }
+    return;
+  }
   if(t.id==='nlist'||t.id==='dtp'){FV[t.id]=t.value;return}
   if(t.dataset.c!==undefined){const k=RANKS[S.rank];S.std[k]=S.std[k]||[];S.std[k][t.dataset.c]=Object.assign({},S.std[k][t.dataset.c],{c:t.checked});save();return}
   if(t.dataset.e!==undefined){const k=RANKS[S.rank];S.std[k]=S.std[k]||[];S.std[k][t.dataset.e]=Object.assign({},S.std[k][t.dataset.e],{e:t.value});save();return}
@@ -117,5 +185,16 @@ SILENT=true;try{settle()}catch(e){}
 applyStrictCheck();
 if(!S.achInit){achList().forEach(a=>{if(a.f(ctx()))S.ach[a.id]=true});S.achInit=true}
 chk();SILENT=false;
-if(!S.base&&!V.ov)V.ov={k:'base'};
-(async()=>{try{if(window.HunterDB&&HunterDB.enabled){const remote=await HunterDB.pull();if(remote&&(remote.savedAt||0)>(S.savedAt||0)){S=Object.assign(FRESH(),remote);toast('Synced from your database.')}}}catch(e){toast('Database unreachable. Using local data.')}render()})();
+if(!HunterStorage.activeProfile()&&!HunterStorage.sessionOnly())V.ov={k:'localAccount'};
+else if(!S.base&&!V.ov)V.ov={k:'base'};
+(async()=>{
+  try{
+    const profile=HunterStorage.activeProfile();
+    if(window.HunterDB&&HunterDB.enabled&&profile&&profile.cloudConsent){
+      HunterDB.setUserId(profile.id);
+      const remote=await HunterDB.pull();
+      if(remote&&(remote.savedAt||0)>(S.savedAt||0)){S=Object.assign(FRESH(),remote);toast('Synced from your database.')}
+    }
+  }catch(e){console.error('Database sync failed.',e);toast('Database unavailable. Local profile data is unchanged.')}
+  render();
+})();

@@ -1,4 +1,3 @@
-const KEY='hunter.v3';
 const $=id=>document.getElementById(id);
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
@@ -40,8 +39,25 @@ quests:[],
 log:[],ci:{},ach:{},dj:{},cd:[],std:{},jf:null,skills:{},shadows:[],inv:[],
 shop:[{t:'A treat',c:150},{t:'Game night',c:300},{t:'A full day off',c:800}]});
 
-function load(){try{const r=localStorage.getItem(KEY);if(r)return Object.assign(FRESH(),JSON.parse(r))}catch(e){}return FRESH()}
-function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(window.HunterDB)HunterDB.pushDebounced(S)}
+function load(){
+  const saved=HunterStorage.activeProfile()?HunterStorage.loadActiveState():null;
+  return Object.assign(FRESH(),saved||{});
+}
+function save(){
+  S.savedAt=Date.now();
+  try{
+    const saved=HunterStorage.saveState(S);
+    if(!saved&&HunterStorage.activeProfile()&&!SILENT)toast('Browser storage is unavailable. Progress may not persist.');
+  }catch(error){
+    console.error('Could not save player data.',error);
+    if(!SILENT)toast('Could not save progress in this browser.');
+  }
+  const profile=HunterStorage.activeProfile();
+  if(window.HunterDB&&HunterDB.enabled&&profile&&profile.cloudConsent){
+    HunterDB.setUserId(profile.id);
+    HunterDB.pushDebounced(S);
+  }
+}
 let S=load();
 (S.cskills||[]).forEach(c=>{if(!SKILLS.some(x=>x[0]===c.name))SKILLS.push([c.name,c.stat])});
 if(!S.resetV4){S.xp=0;S.pts=0;S.maxLv=0;S.claimed={};S.resetV4=true}
@@ -368,15 +384,31 @@ function ovHTML(){
   const o=V.ov;if(!o)return'';
   const close='<div class="row sb"><button class="ico" data-a="close" aria-label="Close">✕</button></div>';
   if(o.k==='rank')return rankView();
+  if(o.k==='localAccount'){
+    const profiles=HunterStorage.listProfiles(),active=HunterStorage.activeProfile();
+    return(active?'<div class="row"><button class="ico" data-a="cancelAccounts" aria-label="Close">✕</button><b style="font-size:24px;font-weight:600">Local profiles</b></div>':'<h2 style="margin-top:0">Create a local profile</h2>')
+      +'<div class="hint">A profile keeps progress in this browser on this device. It is not a password-protected account. Anyone using this browser profile may be able to access its saved data.</div>'
+      +(profiles.length?'<div class="sec">Choose a profile</div>'+profiles.map(profile=>'<button class="op" data-a="useLocalProfile" data-i="'+esc(profile.id)+'"><span><b>'+esc(profile.name)+'</b><span class="hint">'+(active&&active.id===profile.id?'Current profile':'Saved on this browser')+'</span></span></button>').join(''):'')
+      +'<div class="sec">Create profile</div>'
+      +'<label class="l" for="localProfileName">Display name</label><input id="localProfileName" maxlength="40" value="'+esc(fv('localProfileName',S.name==='Player'?'':S.name))+'" placeholder="Name">'
+      +'<label class="row" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="localConsent"><span>I agree to save my progress in this browser. Any older save will be migrated only after I consent. The browser does not show a permission prompt for local storage, and clearing site data can erase this profile.</span></label>'
+      +(window.HunterDB&&HunterDB.enabled?'<label class="row" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="cloudConsent"><span>Also allow optional sync to my configured database. This sends profile progress outside this browser.</span></label>':'')
+      +'<button class="btn" data-a="createLocalProfile">Save consent and create profile</button>'
+      +(!active?'<button class="btn ghost" data-a="sessionOnly">Continue without saving on this device</button>':'')
+      +'<div class="hint" style="margin-top:12px">'+(HunterStorage.isAvailable()?'Local browser storage is available.':'Local browser storage is unavailable. You can continue for this session without saving.')+'</div>';
+  }
   if(o.k==='menu')return'<div class="row"><button class="ico" data-a="close" aria-label="Close">✕</button><b style="font-size:24px;font-weight:600">Menu</b></div>'
     +'<label class="l" for="nm">Player name</label><input id="nm" value="'+esc(S.name)+'">'
+    +'<button class="btn ghost" data-a="accounts">Manage local profiles</button>'
+    +(window.HunterDB&&HunterDB.enabled?'<label class="row" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="cloudSync"'+(HunterStorage.cloudConsent()?' checked':'')+'><span>Optional database sync</span></label><div class="hint">Off by default. When enabled, this profile is sent to the configured database.</div>':'<div class="hint" style="margin-top:12px">Local profile data stays in this browser. Optional database sync is not configured.</div>')
     +'<label class="l" for="dial">Honesty dial</label>'+sel('dial',[[0,'Normal'],[1,'Hard'],[2,'Savage']],S.dial)
     +'<label class="row" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="pause"'+(S.pause?' checked':'')+'> <span>Pause the System (no penalties or reports)</span></label>'
     +'<button class="btn ghost" data-a="rerun">Run baseline assessment again</button>'
     +'<label class="row" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="sound"'+(S.sound!==false?' checked':'')+'> <span>Sound effects</span></label><label class="row" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="strict"'+(S.strict?' checked':'')+'> <span>Hardcore mode: strict penalties and dark theme</span></label>'+rulesHTML()+'<label class="l" for="io">Backup</label><textarea id="io" rows="4" aria-label="Backup data"></textarea>'
     +'<div class="grid2" style="margin-top:10px"><button class="btn ghost" data-a="exp">Show backup</button><button class="btn ghost" data-a="imp">Import</button></div>'
     +'<button class="btn danger" data-a="rst">Reset everything</button>'
-    +'<div class="hint" style="margin-top:14px">Your data lives in this browser. Leaderboards need an online account, which this version does not have.</div>';
+    +'<button class="btn danger" data-a="forgetLocalProfile">Delete this local profile and its browser data</button>'
+    +'<div class="hint" style="margin-top:14px">This is a browser-local profile, not an online account. Leaderboards need an online account, which this version does not have.</div>';
   if(o.k==='base')return'<h2 style="margin-top:0">Baseline Assessment</h2><div class="hint">An honest starting point. Your answers set your starting stats and dial.</div>'
     +'<label class="l" for="bs">Average sleep per night</label>'+sel('bs',[[5,'Under 5 hours'],[6,'5 to 6.5 hours'],[7,'7 to 8 hours'],[8,'8+ hours']],7)
     +'<label class="l" for="bw">Workouts per week</label>'+sel('bw',[[0,'None'],[1,'1 to 2'],[3,'3 to 4'],[5,'5 or more']],1)

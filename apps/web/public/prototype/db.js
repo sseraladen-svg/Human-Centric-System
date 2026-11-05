@@ -3,6 +3,7 @@
 (function () {
   const cfg = window.HUNTER_CONFIG || {};
   const enabled = !!(cfg.supabaseUrl && cfg.supabaseKey && cfg.userId);
+  let userId = cfg.userId;
   const headers = () => ({ apikey: cfg.supabaseKey, Authorization: "Bearer " + cfg.supabaseKey, "Content-Type": "application/json" });
   let timer = null;
 
@@ -11,7 +12,7 @@
     const r = await fetch(cfg.supabaseUrl + "/rest/v1/hunter_state?on_conflict=user_id", {
       method: "POST",
       headers: { ...headers(), Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify([{ user_id: cfg.userId, data: state, updated_at: new Date().toISOString() }])
+      body: JSON.stringify([{ user_id: userId, data: state, updated_at: new Date().toISOString() }])
     });
     return r.ok;
   }
@@ -22,10 +23,13 @@
   }
   async function pull() {
     if (!enabled) return null;
-    const r = await fetch(cfg.supabaseUrl + "/rest/v1/hunter_state?user_id=eq." + encodeURIComponent(cfg.userId) + "&select=data", { headers: headers() });
+    const r = await fetch(cfg.supabaseUrl + "/rest/v1/hunter_state?user_id=eq." + encodeURIComponent(userId) + "&select=data", { headers: headers() });
     if (!r.ok) return null;
     const rows = await r.json();
     return rows[0] ? rows[0].data : null;
   }
-  window.HunterDB = { enabled, push, pushDebounced, pull };
+  function setUserId(id) {
+    userId = id || cfg.userId;
+  }
+  window.HunterDB = { enabled, push, pushDebounced, pull, setUserId };
 })();

@@ -2,7 +2,9 @@
 
 A habit and discipline tracking prototype with a Next.js app, browser-based frontend, API scaffold, shared game engine, and database packages.
 
-The root URL redirects to `/player.html`. The page and all browser assets have one canonical home under `apps/web/public/`. Progress in the prototype is saved in browser local storage by default.
+The root URL redirects to `/player.html`. The page and all browser assets have one canonical home under `apps/web/public/`. On first use, the prototype asks before saving a named local profile. Each profile is stored separately in this browser; no cloud sync happens unless it is separately enabled in the app and configured.
+
+Local profiles are not authenticated accounts or password-protected. Anyone with access to the same browser profile may be able to access them. Clearing site data can erase local progress. Users can also continue for one session without saving.
 
 ## Repository structure
 
@@ -47,6 +49,14 @@ Schema and migration assets live under `packages/db/`.
 - `packages/db/migrations/001_init.sql` contains the initial migration.
 
 To apply migrations in a Supabase project, run the SQL in a Postgres session or use your preferred migration runner.
+
+## Browser storage and optional sync
+
+- Local profile creation requires explicit in-product consent. Browsers do not display a permission prompt for `localStorage`.
+- Progress stays in per-profile browser storage by default. Local profiles are not verified identities.
+- Database sync remains optional and disabled per profile until the user opts in. The existing browser Supabase adapter still requires its configuration in `apps/web/public/prototype/config.js`.
+- The browser-side database adapter is suitable only for an explicitly configured project with appropriate access policies. It is not a substitute for authenticated, server-enforced user isolation.
+- If local storage is unavailable, the user can continue for the current session without persistence.
 
 ## Run the app
 
